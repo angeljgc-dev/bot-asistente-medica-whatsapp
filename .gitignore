@@ -1,0 +1,28 @@
+# Dependencias
+node_modules/
+
+# Secretos y credenciales
+.env
+*-service-account.json
+google-credentials*.json
+auth/
+*.pem
+*.key
+
+# Sesiones de WhatsApp
+session/
+.wwebjs_auth/
+baileys_auth/
+
+# Bases de datos
+data/
+backups/
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# Logs
+logs/
+*.log

@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Panel Clinica — KPIs</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 1.5rem; background: #f7f7f9; color: #222; }
+    @media (prefers-color-scheme: dark) { body { background:#121218; color:#eee; } .card { background:#1c1c24 !important; box-shadow:none !important; } th,td{border-color:#2a2a33 !important;} }
+    h1 { margin: 0 0 .25rem 0; font-size: 1.4rem; }
+    .subtitle { color:#888; margin-bottom: 1.5rem; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem; }
+    .card { background: #fff; border-radius: 10px; padding: 1rem 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+    .card h2 { font-size: 1rem; margin: 0 0 .75rem 0; font-weight: 600; }
+    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: .5rem; }
+    .kpi { padding: .75rem; border-radius: 8px; background: #f0f1f5; }
+    .kpi .label { font-size: .75rem; color: #666; text-transform: uppercase; }
+    .kpi .value { font-size: 1.5rem; font-weight: 700; }
+    .bad  .value { color: #c93434; }
+    .good .value { color: #2a8a3a; }
+    table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+    th, td { text-align: left; padding: .45rem .5rem; border-bottom: 1px solid #eee; }
+    th { font-weight: 600; color: #555; }
+    .err { color:#c93434; padding:1rem; background:#fff0f0; border-radius:8px; }
+  </style>
+</head>
+<body>
+  <h1>Panel Clinica</h1>
+  <div class="subtitle" id="subtitle">Cargando KPIs...</div>
+
+  <div class="grid">
+    <div class="card" id="card-kpis">
+      <h2>KPIs (últimos 7 días)</h2>
+      <div class="kpis" id="kpi-grid"></div>
+    </div>
+
+    <div class="card">
+      <h2>Intents vs Fallbacks (30 días)</h2>
+      <canvas id="chart-intents" height="160"></canvas>
+    </div>
+
+    <div class="card">
+      <h2>Citas creadas vs canceladas (30 días)</h2>
+      <canvas id="chart-citas" height="160"></canvas>
+    </div>
+
+    <div class="card">
+      <h2>Últimas escalaciones</h2>
+      <table><thead><tr><th>Cuándo</th><th>Teléfono</th><th>Motivo</th></tr></thead>
+        <tbody id="tbl-escalaciones"><tr><td colspan="3">—</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>Últimas urgencias (triage)</h2>
+      <table><thead><tr><th>Cuándo</th><th>Teléfono</th><th>Texto</th></tr></thead>
+        <tbody id="tbl-urgencias"><tr><td colspan="3">—</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+<script>
+  const params = new URLSearchParams(location.search);
+  const token = params.get('token') || '';
+
+  async function fetchJSON(path) {
+    const r = await fetch(path, { headers: { Authorization: 'Bearer ' + token } });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  }
+
+  function fillKPIs(kpi) {
+    const items = [
+      { label: 'Intents',            value: kpi.intents,          klass: '' },
+      { label: 'Fallbacks',          value: kpi.fallbacks,        klass: '' },
+      { label: 'Fallback rate',      value: kpi.fallback_rate_pct + '%',
+        klass: kpi.fallback_rate_pct > 20 ? 'bad' : 'good' },
+      { label: 'Citas creadas',      value: kpi.citas_creadas,    klass: 'good' },
+      { label: 'Citas canceladas',   value: kpi.citas_canceladas, klass: '' },
+      { label: 'Reagendamientos',    value: kpi.reagendamientos,  klass: '' },
+      { label: 'Escalaciones',       value: kpi.escalaciones,     klass: '' },
+      { label: 'Urgencias',          value: kpi.urgencias,        klass: kpi.urgencias > 0 ? 'bad' : '' },
+    ];
+    const grid = document.getElementById('kpi-grid');
+    grid.innerHTML = items.map(i =>
+      '<div class="kpi ' + i.klass + '">' +
+      '<div class="label">' + i.label + '</div>' +
+      '<div class="value">' + i.value + '</div>' +
+      '</div>'
+    ).join('');
+    document.getElementById('subtitle').textContent = 'Ventana ' + kpi.ventana + ' · generado ' + kpi.generado_en;
+  }
+
+  function buildLineChart(ctxId, labels, datasets) {
+    new Chart(document.getElementById(ctxId), {
+      type: 'line',
+      data: { labels, datasets },
+      options: {
+        responsive: true,
+        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+        plugins: { legend: { position: 'bottom' } },
+      },
+    });
+  }
+
+  function unifyLabels(series) {
+    const set = new Set();
+    for (const s of series) for (const r of s) set.add(r.fecha);
+    return Array.from(set).sort();
+  }
+
+  function seriesFor(labels, rows) {
+    const m = new Map(rows.map(r => [r.fecha, r.n]));
+    return labels.map(d => m.get(d) || 0);
+  }
+
+  function fillTable(tbodyId, rows, parserFn) {
+    const tb = document.getElementById(tbodyId);
+    if (!rows || rows.length === 0) {
+      tb.innerHTML = '<tr><td colspan="3">— Sin eventos —</td></tr>';
+      return;
+    }
+    tb.innerHTML = rows.map(r => {
+      let detalle = '';
+      try { detalle = parserFn(JSON.parse(r.payload || '{}')); } catch (_) { detalle = r.payload || ''; }
+      return '<tr><td>' + r.creado_en + '</td><td>' + (r.telefono || '—') + '</td><td>' + detalle + '</td></tr>';
+    }).join('');
+  }
+
+  (async () => {
+    try {
+      const [kpi, data] = await Promise.all([
+        fetchJSON('/panel'),
+        fetchJSON('/api/panel/series?dias=30'),
+      ]);
+      fillKPIs(kpi);
+
+      const labelsIntents = unifyLabels([data.series.intents, data.series.fallbacks]);
+      buildLineChart('chart-intents', labelsIntents, [
+        { label: 'Intents',   data: seriesFor(labelsIntents, data.series.intents),   borderColor: '#2a8a3a', fill: false },
+        { label: 'Fallbacks', data: seriesFor(labelsIntents, data.series.fallbacks), borderColor: '#c93434', fill: false },
+      ]);
+
+      const labelsCitas = unifyLabels([data.series.citas_creadas, data.series.citas_canceladas]);
+      buildLineChart('chart-citas', labelsCitas, [
+        { label: 'Creadas',    data: seriesFor(labelsCitas, data.series.citas_creadas),    borderColor: '#2a8a3a', fill: false },
+        { label: 'Canceladas', data: seriesFor(labelsCitas, data.series.citas_canceladas), borderColor: '#c93434', fill: false },
+      ]);
+
+      fillTable('tbl-escalaciones', data.escalaciones, p => p.motivo || p.intent || '—');
+      fillTable('tbl-urgencias',    data.urgencias,    p => (p.texto_truncado || '').slice(0, 120));
+    } catch (e) {
+      document.body.insertAdjacentHTML('beforeend',
+        '<div class="err">Error cargando panel: ' + e.message + '. Verifica el token.</div>');
+    }
+  })();
+</script>
+</body>
+</html>
