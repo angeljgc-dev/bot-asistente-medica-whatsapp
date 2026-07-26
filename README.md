@@ -1,60 +1,57 @@
 [English](README.en.md) · **Español**
 
-# Bot de WhatsApp — Recepcionista IA para Consultorio Médico
+# Bot de WhatsApp para consultorio médico
 
 ![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A524-339933?logo=nodedotjs&logoColor=white)
 ![Baileys](https://img.shields.io/badge/WhatsApp-Baileys%206.x-25D366?logo=whatsapp&logoColor=white)
-![SQLite](https://img.shields.io/badge/SQLite-better--sqlite3%20v12-003B57?logo=sqlite&logoColor=white)
 ![Groq](https://img.shields.io/badge/LLM-Groq%20·%20Llama%203.1%208B-F55036)
-![Express](https://img.shields.io/badge/API-Express%204-000000?logo=express&logoColor=white)
-![Google Calendar](https://img.shields.io/badge/Agenda-Google%20Calendar%20API%20v3-4285F4?logo=googlecalendar&logoColor=white)
-![Stripe](https://img.shields.io/badge/Pagos-Stripe-635BFF?logo=stripe&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-217%2F230-yellowgreen)
+![SQLite](https://img.shields.io/badge/SQLite-better--sqlite3%20v12-003B57?logo=sqlite&logoColor=white)
 
-Asistente conversacional de WhatsApp que actúa como **recepcionista virtual de una clínica médica mexicana**. Automatiza el ciclo completo de atención al paciente por chat: registro, agendamiento de citas con sincronización a Google Calendar, recordatorios, encuestas de satisfacción, cobro de anticipos y notificaciones al médico — todo en español natural, con detección de intenciones propia y un LLM (Groq) como respaldo conversacional.
+Asistente conversacional de WhatsApp que hace de recepcionista virtual de una clínica médica mexicana. Automatiza el ciclo completo de atención al paciente por chat: registro, agendamiento de citas con sincronización a Google Calendar, recordatorios, encuestas de satisfacción, cobro de anticipos y notificaciones al médico. Todo en español natural, con detección de intenciones propia y un LLM (Groq) como respaldo conversacional.
 
-> ⚠️ **Nota**: usa Baileys (cliente no oficial de WhatsApp). Para producción a gran escala se recomienda migrar a un BSP oficial (WATI, Gupshup, 360dialog).
+Lo armé porque los consultorios chicos pierden citas y gastan horas contestando los mismos mensajes de WhatsApp. El bot responde al instante, agenda directo en el calendario del médico y solo pasa la conversación a una persona cuando de verdad hace falta.
+
+> Nota: usa Baileys, un cliente no oficial de WhatsApp. Para producción a gran escala conviene migrar a un BSP oficial (WATI, Gupshup, 360dialog).
 
 ---
 
-## Características principales
+## Qué hace
 
-### Gestión de citas de punta a punta
-- **Registro de pacientes** conversacional (nombre, fecha de nacimiento) con recuperación de sesión perdida.
-- **Agendar / reagendar / cancelar / consultar citas** con lenguaje natural mexicano ("pasado mañana a las 5 y media", "el martes en la tarde").
-- **Sincronización con Google Calendar**: eventos tentativos con TTL mientras el paciente confirma, verificación de disponibilidad (free/busy) y limpieza automática de tentativos huérfanos al reiniciar.
-- **Botones y listas interactivas** de WhatsApp (menú principal, confirmaciones, selección de horarios) con fallback a texto plano.
+### Citas de punta a punta
+- Registro de pacientes conversacional (nombre, fecha de nacimiento), con recuperación si se pierde la sesión.
+- **Agendar, reagendar, cancelar y consultar citas** con lenguaje natural mexicano ("pasado mañana a las 5 y media", "el martes en la tarde").
+- Sincronización con Google Calendar: eventos tentativos con TTL mientras el paciente confirma, verificación de disponibilidad (free/busy) y limpieza de tentativos huérfanos al reiniciar.
+- Botones y listas interactivas de WhatsApp (menú, confirmaciones, selección de horarios) con fallback a texto plano.
 
-### Recordatorios y seguimiento automático
-- Recordatorios de cita **24 h y 2 h antes** (cron cada 5 minutos).
-- **Verificación de asistencia**: tras la cita, el bot pregunta al médico si el paciente asistió.
-- **Felicitaciones de cumpleaños** diarias (9:00 AM).
-- **Encuesta NPS post-consulta** enviada diariamente a las 19:00.
+### Recordatorios y seguimiento
+- Recordatorios de cita 24 h y 2 h antes (cron cada 5 minutos).
+- **Verificación de asistencia**: después de la cita el bot le pregunta al médico si el paciente asistió.
+- Felicitaciones de cumpleaños diarias (9:00 AM) y encuesta NPS post-consulta a las 19:00.
 
 ### Notificaciones al doctor
-- Reporte pre-consulta con el **motivo de consulta** del paciente.
+- Reporte pre-consulta con el motivo de la consulta del paciente.
 - **Escalamiento a humano**: ante urgencias o petición explícita, el bot alerta al médico y guarda silencio 30 minutos.
-- **Triage de síntomas**: mensajes de emergencia (dolor de pecho, dificultad para respirar) se escalan en lugar de agendarse.
-- Alerta operativa si la tasa de fallback al LLM supera el umbral (parser perdiendo intents).
+- Triage de síntomas: los mensajes de emergencia (dolor de pecho, dificultad para respirar) se escalan en lugar de agendarse.
+- Alerta operativa si la tasa de fallback al LLM supera el umbral, señal de que el parser está perdiendo intents.
 
 ### NLP híbrido (parser propio + LLM)
-- **`intentParser`** con 18+ intenciones y mexicanismos; parsers dedicados de fechas, horas y números en español.
-- **Groq (`llama-3.1-8b-instant`)** como fallback conversacional con personalidad definida ("Valentina", recepcionista empática) y límites estrictos: jamás diagnostica ni inventa citas.
-- Máquina de estados de 14 estados que gobierna cada flujo conversacional (TTL de sesión: 10 min).
+- **`intentParser`** con 18+ intenciones y mexicanismos, más parsers dedicados de fechas, horas y números en español.
+- Groq (`llama-3.1-8b-instant`) como fallback conversacional con personalidad definida ("Valentina", recepcionista empática) y límites estrictos: jamás diagnostica ni inventa citas.
+- Máquina de 14 estados que gobierna cada flujo conversacional (TTL de sesión: 10 min).
 
 ### Panel web y métricas
-- **Panel de KPIs** (`/panel` JSON y `/panel.html` con gráficas): intents, fallbacks, citas creadas/canceladas, reagendamientos, escalaciones, urgencias y fallback rate a 7 días.
-- **Series diarias** para gráficas (`/api/panel/series`, hasta 180 días).
+- Panel de KPIs (`/panel` en JSON y `/panel.html` con gráficas): intents, fallbacks, citas creadas/canceladas, reagendamientos, escalaciones, urgencias y fallback rate a 7 días.
+- Series diarias para gráficas (`/api/panel/series`, hasta 180 días).
 - Métricas persistidas en SQLite por evento (intent detectado, fallback, pago, escalación...).
 
 ### Cumplimiento legal (LFPDPPP, México)
-- **Aviso de privacidad** público versionado (`/aviso-privacidad`).
-- **Opt-in explícito** con registro de versión de consentimiento.
-- **Derechos ARCO**: baja por WhatsApp (palabra clave) y endpoints de acceso/cancelación de datos.
+- Aviso de privacidad público y versionado (`/aviso-privacidad`).
+- Opt-in explícito con registro de la versión de consentimiento.
+- **Derechos ARCO**: baja por WhatsApp (palabra clave) y endpoints de acceso y cancelación de datos.
 
 ### Pagos y difusión
-- **Anticipos con Stripe Checkout** (opcional, configurable en centavos) con webhook firmado y confirmación automática de la cita al pagar.
-- **Broadcasts segmentados** con verificación de consentimiento previo.
+- Anticipos con Stripe Checkout (opcional, configurable en centavos) con webhook firmado y confirmación automática de la cita al pagar.
+- Broadcasts segmentados con verificación de consentimiento previo.
 
 ---
 
@@ -147,7 +144,7 @@ bot-asistente-medica-whatsapp/
 
 ```bash
 # 1. Clonar e instalar dependencias
-git clone https://github.com/B0B1A6AE23/bot-asistente-medica-whatsapp.git
+git clone https://github.com/angeljgc-dev/bot-asistente-medica-whatsapp.git
 cd bot-asistente-medica-whatsapp
 npm install
 
@@ -168,19 +165,19 @@ Al arrancar, abre `http://localhost:3000/qr` y escanea el código con WhatsApp (
 
 | Variable | Obligatoria | Descripción |
 |---|---|---|
-| `GROQ_API_KEY` | ✅ | API key de Groq (`gsk_...`) para el fallback conversacional |
-| `DOCTOR_PHONE` | ✅ | Teléfono del médico con código de país, sin `+` (ej. `52XXXXXXXXXX`). Recibe reportes y alertas |
-| `DOCTOR_NAME` | — | Nombre del médico mostrado en mensajes y prompt del LLM (ej. `Dr. Pérez`) |
-| `CLINIC_NAME` | — | Nombre de la clínica que usa el bot al presentarse |
-| `CLINIC_HOURS` | — | Horario de atención (ej. `Lunes a Viernes, 8:00 AM a 8:00 PM`) |
-| `IGNORED_PHONES` | — | Teléfonos separados por coma que el bot ignora (útil si el número del bot es personal) |
-| `API_SECRET_TOKEN` | — | Bearer token para endpoints protegidos (`/send-message`, `/panel`, `/arco`, `/broadcast`). Usa un valor largo y aleatorio |
-| `GOOGLE_CREDENTIALS_PATH` | — | Ruta al JSON del Service Account (por defecto `./auth/google-credentials.json`) |
-| `GOOGLE_CALENDAR_ID` | — | ID del calendario donde se crean los eventos. Vacío = Calendar deshabilitado |
-| `PORT` | — | Puerto del servidor HTTP (por defecto `3000`) |
-| `NODE_ENV` | — | `production` o `development` |
+| `GROQ_API_KEY` | Sí | API key de Groq (`gsk_...`) para el fallback conversacional |
+| `DOCTOR_PHONE` | Sí | Teléfono del médico con código de país, sin `+` (ej. `52XXXXXXXXXX`). Recibe reportes y alertas |
+| `DOCTOR_NAME` | No | Nombre del médico mostrado en mensajes y prompt del LLM (ej. `Dr. Pérez`) |
+| `CLINIC_NAME` | No | Nombre de la clínica que usa el bot al presentarse |
+| `CLINIC_HOURS` | No | Horario de atención (ej. `Lunes a Viernes, 8:00 AM a 8:00 PM`) |
+| `IGNORED_PHONES` | No | Teléfonos separados por coma que el bot ignora (útil si el número del bot es personal) |
+| `API_SECRET_TOKEN` | No | Bearer token para endpoints protegidos (`/send-message`, `/panel`, `/arco`, `/broadcast`). Usa un valor largo y aleatorio |
+| `GOOGLE_CREDENTIALS_PATH` | No | Ruta al JSON del Service Account (por defecto `./auth/google-credentials.json`) |
+| `GOOGLE_CALENDAR_ID` | No | ID del calendario donde se crean los eventos. Vacío = Calendar deshabilitado |
+| `PORT` | No | Puerto del servidor HTTP (por defecto `3000`) |
+| `NODE_ENV` | No | `production` o `development` |
 
-> 💡 Los pagos con Stripe son opcionales y se configuran mediante variables adicionales documentadas en `src/config/env.js` (con `PAGO_ANTICIPO_CENTAVOS=0` el flujo de cobro se omite por completo).
+Los pagos con Stripe son opcionales y se configuran con variables adicionales documentadas en `src/config/env.js`. Con `PAGO_ANTICIPO_CENTAVOS=0` el flujo de cobro se omite por completo.
 
 ## Scripts
 
@@ -188,16 +185,16 @@ Al arrancar, abre `http://localhost:3000/qr` y escanea el código con WhatsApp (
 |---|---|
 | `npm start` | Inicia el bot (`node src/index.js`) |
 | `npm run dev` | Modo desarrollo con recarga automática (`node --watch`) |
-| `npm run migrate` | Aplica las migraciones de SQLite (001–009) |
+| `npm run migrate` | Aplica las migraciones de SQLite (001-009) |
 | `npm run import-patients` | Importa pacientes desde un Excel/Sheets (`scripts/migrate-from-sheets.js`) |
 
 ## API HTTP
 
 | Endpoint | Auth | Descripción |
 |---|---|---|
-| `GET /qr` | — | Página con el QR de vinculación de WhatsApp |
-| `GET /health` | — | Estado del servicio y de la conexión de WhatsApp |
-| `GET /aviso-privacidad` | — | Aviso de privacidad público (LFPDPPP) |
+| `GET /qr` | público | Página con el QR de vinculación de WhatsApp |
+| `GET /health` | público | Estado del servicio y de la conexión de WhatsApp |
+| `GET /aviso-privacidad` | público | Aviso de privacidad público (LFPDPPP) |
 | `POST /send-message` | Bearer | Envía un mensaje de WhatsApp desde sistemas externos |
 | `GET /panel` | Bearer | KPIs de los últimos 7 días (JSON) |
 | `GET /panel.html` | token (query) | Panel web con gráficas |
@@ -240,6 +237,6 @@ Suites complementarias por área:
 
 ## Autor y licencia
 
-**Ángel Josué García Cantero** — [github.com/AngelJGC](https://github.com/AngelJGC)
+Ángel Josué García Canteros ([github.com/angeljgc-dev](https://github.com/angeljgc-dev)).
 
-Distribuido bajo licencia **MIT**. Consulta el archivo `LICENSE` para más detalles.
+Distribuido bajo licencia MIT. Consulta el archivo `LICENSE` para más detalles.
